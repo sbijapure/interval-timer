@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interval Timer</title>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function IntervalBeepTimer() {
+          const [isRunning, setIsRunning] = useState(false);
+          const [beepInterval, setBeepInterval] = useState(120);
+          const [totalDuration, setTotalDuration] = useState(3600);
+          const [elapsedTime, setElapsedTime] = useState(0);
+          const [soundType, setSoundType] = useState('beep');
+          const [nextBeepIn, setNextBeepIn] = useState(120);
+          
+          const audioContextRef = useRef(null);
+          const intervalTimerRef = useRef(null);
+          const beepTimerRef = useRef(null);
+
+          useEffect(() => {
+            audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+            return () => {
+              if (audioContextRef.current) {
+                audioContextRef.current.close();
+              }
+            };
+          }, []);
+
+          const playSound = (type) => {
+            const ctx = audioContextRef.current;
+            if (!ctx) return;
+
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            
+            const now = ctx.currentTime;
+            
+            switch(type) {
+              case 'beep':
+                osc.frequency.value = 800;
+                osc.type = 'sine';
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+                break;
+              case 'ding':
+                osc.frequency.value = 1200;
+                osc.type = 'sine';
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+                break;
+              case 'tick':
+                osc.frequency.value = 1500;
+                osc.type = 'square';
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                osc.start(now);
+                osc.stop(now + 0.05);
+                break;
+              case 'chime':
+                osc.frequency.value = 523.25;
+                osc.type = 'sine';
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+                setTimeout(() => {
+                  const osc2 = ctx.createOscillator();
+                  const gain2 = ctx.createGain();
+                  osc2.connect(gain2);
+                  gain2.connect(ctx.destination);
+                  osc2.frequency.value = 659.25;
+                  osc2.type = 'sine';
+                  const now2 = ctx.currentTime;
+                  gain2.gain.setValueAtTime(0.3, now2);
+                  gain2.gain.exponentialRampToValueAtTime(0.01, now2 + 0.5);
+                  osc2.start(now2);
+                  osc2.stop(now2 + 0.5);
+                }, 200);
+                break;
+            }
+          };
+
+          const startTimer = () => {
+            if (audioContextRef.current.state === 'suspended') {
+              audioContextRef.current.resume();
+            }
+            
+            setIsRunning(true);
+            setElapsedTime(0);
+            setNextBeepIn(beepInterval);
+            
+            playSound(soundType);
+            
+            intervalTimerRef.current = setInterval(() => {
+              setElapsedTime(prev => {
+                const newElapsed = prev + 1;
+                if (newElapsed >= totalDuration) {
+                  stopTimer();
+                  return totalDuration;
+                }
+                return newElapsed;
+              });
+              
+              setNextBeepIn(prev => {
+                if (prev <= 1) {
+                  playSound(soundType);
+                  return beepInterval;
+                }
+                return prev - 1;
+              });
+            }, 1000);
+          };
+
+          const stopTimer = () => {
+            setIsRunning(false);
+            if (intervalTimerRef.current) {
+              clearInterval(intervalTimerRef.current);
+            }
+            if (beepTimerRef.current) {
+              clearTimeout(beepTimerRef.current);
+            }
+          };
+
+          const resetTimer = () => {
+            stopTimer();
+            setElapsedTime(0);
+            setNextBeepIn(beepInterval);
+          };
+
+          const formatTime = (seconds) => {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = seconds % 60;
+            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+          };
+
+          const timePresets = [
+            { label: '5 sec', value: 5 },
+            { label: '10 sec', value: 10 },
+            { label: '30 sec', value: 30 },
+            { label: '1 min', value: 60 },
+            { label: '2 min', value: 120 },
+            { label: '5 min', value: 300 },
+            { label: '10 min', value: 600 },
+            { label: '30 min', value: 1800 },
+            { label: '1 hour', value: 3600 }
+          ];
+
+          const durationPresets = [
+            { label: '5 min', value: 300 },
+            { label: '10 min', value: 600 },
+            { label: '15 min', value: 900 },
+            { label: '30 min', value: 1800 },
+            { label: '1 hour', value: 3600 },
+            { label: '2 hours', value: 7200 },
+            { label: '4 hours', value: 14400 }
+          ];
+
+          const progress = (elapsedTime / totalDuration) * 100;
+
+          return (
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
+              <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl p-8">
+                <div className="text-center mb-8">
+                  <h1 className="text-3xl font-bold text-gray-800 mb-2">Interval Timer</h1>
+                  <p className="text-gray-600">Play sounds at regular intervals</p>
+                </div>
+
+                <div className="mb-8">
+                  <div className="bg-gradient-to-r from-indigo-500 to-purple-500 rounded-xl p-6 text-white mb-4">
+                    <div className="text-5xl font-mono font-bold text-center mb-2">
+                      {formatTime(elapsedTime)}
+                    </div>
+                    <div className="h-3 bg-white bg-opacity-30 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-white transition-all duration-1000"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="text-center text-gray-600">
+                    Next beep in: <span className="font-semibold text-indigo-600">{nextBeepIn}s</span>
+                  </div>
+                </div>
+
+                <div className="space-y-6 mb-8">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      Beep Interval (every)
+                    </label>
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      {timePresets.map(preset => (
+                        <button
+                          key={preset.value}
+                          onClick={() => !isRunning && setBeepInterval(preset.value)}
+                          disabled={isRunning}
+                          className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
+                            beepInterval === preset.value
+                              ? 'bg-indigo-500 text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          } ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      type="number"
+                      value={beepInterval}
+                      onChange={(e) => !isRunning && setBeepInterval(Math.max(1, parseInt(e.target.value) || 1))}
+                      disabled={isRunning}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100"
+                      min="1"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Seconds between each beep</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      Total Duration (stop after)
+                    </label>
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      {durationPresets.map(preset => (
+                        <button
+                          key={preset.value}
+                          onClick={() => !isRunning && setTotalDuration(preset.value)}
+                          disabled={isRunning}
+                          className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
+                            totalDuration === preset.value
+                              ? 'bg-purple-500 text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          } ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      type="number"
+                      value={totalDuration}
+                      onChange={(e) => !isRunning && setTotalDuration(Math.max(1, parseInt(e.target.value) || 1))}
+                      disabled={isRunning}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100"
+                      min="1"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Total seconds to run (or stop manually)</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      Sound Type
+                    </label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {['beep', 'ding', 'tick', 'chime'].map(sound => (
+                        <button
+                          key={sound}
+                          onClick={() => {
+                            setSoundType(sound);
+                            playSound(sound);
+                          }}
+                          className={`px-4 py-3 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2 ${
+                            soundType === sound
+                              ? 'bg-green-500 text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                          </svg>
+                          {sound}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  {!isRunning ? (
+                    <button
+                      onClick={startTimer}
+                      className="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition shadow-lg"
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                      </svg>
+                      Start
+                    </button>
+                  ) : (
+                    <button
+                      onClick={stopTimer}
+                      className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition shadow-lg"
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="6" y="4" width="4" height="16"></rect>
+                        <rect x="14" y="4" width="4" height="16"></rect>
+                      </svg>
+                      Stop
+                    </button>
+                  )}
+                  
+                  <button
+                    onClick={resetTimer}
+                    className="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition shadow-lg"
+                  >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="1 4 1 10 7 10"></polyline>
+                      <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                    </svg>
+                    Reset
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        ReactDOM.render(<IntervalBeepTimer />, document.getElementById('root'));
+    </script>
+</body>
+</html>
