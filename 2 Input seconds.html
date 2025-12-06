@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Color Cycle Clock</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 40px;
+        background: #222;
+        color: #fff;
+        text-align: center;
+    }
+    #square {
+        width: 400px;
+        height: 400px;
+        margin: 40px auto;
+        background-color: red;
+        transition: background-color 0s;   /* instant change */
+    }
+    .controls {
+        margin: 20px;
+    }
+    input[type="number"] {
+        padding: 10px;
+        font-size: 18px;
+        width: 100px;
+        text-align: center;
+    }
+    button {
+        padding: 10px 20px;
+        font-size: 18px;
+        margin-left: 10px;
+        cursor: pointer;
+    }
+</style>
+</head>
+<body>
+
+<h1>Color Cycle Clock</h1>
+
+<div id="square"></div>
+
+<div class="controls">
+    <label for="duration">Duration per color (seconds):</label><br><br>
+    <input type="number" id="duration" min="0.1" step="0.1" value="1">
+    <button onclick="updateDuration()">Set Duration</button>
+</div>
+
+<p>Current duration: <strong id="current">1</strong> second(s) per color</p>
+
+<script>
+const colors = ['red', 'blue', 'green', 'yellow'];
+let duration = 1;           // default 1 second
+let intervalId = null;
+
+const square = document.getElementById('square');
+const currentDisplay = document.getElementById('current');
+
+function startCycle() {
+    if (intervalId) clearInterval(intervalId);
+
+    let index = 0;
+    square.style.backgroundColor = colors[0];  // start with red immediately
+
+    intervalId = setInterval(() => {
+        index = (index + 1) % colors.length;
+        square.style.backgroundColor = colors[index];
+    }, duration * 1000);
+}
+
+function updateDuration() {
+    const input = document.getElementById('duration');
+    let newDuration = parseFloat(input.value);
+
+    if (isNaN(newDuration) || newDuration < 0.1) {
+        alert("Please enter a positive number (minimum 0.1)");
+        return;
+    }
+
+    duration = newDuration;
+    currentDisplay.textContent = duration;
+    startCycle();  // restart with new timing immediately
+}
+
+// Allow pressing Enter in the input box
+document.getElementById('duration').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') updateDuration();
+});
+
+// Start with default 1-second cycle
+startCycle();
+</script>
+
+</body>
+</html>
