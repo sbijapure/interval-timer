@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chess Clock 2.0</title>
+
+<style>
+    body {
+        margin: 0;
+        background: #808080;
+        font-family: Calibri, system-ui, Arial, sans-serif;
+        user-select: none;
+        overflow: hidden;
+    }
+
+    /* Top SET TIME bar */
+    #setTimeBtn {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 40px;
+        background: black;
+        color: white;
+        text-align: center;
+        line-height: 40px;
+        font-weight: bold;
+        z-index: 10;
+    }
+
+    /* Clock container */
+    #clockContainer {
+        display: flex;
+        height: 100vh;
+        padding-top: 40px;
+        box-sizing: border-box;
+    }
+
+    .clockSide {
+        width: 50%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 2vh;
+        font-size: 10vw;
+        font-weight: 800;
+    }
+
+    #leftClock { color: black; }
+    #rightClock { color: white; }
+
+    /* Time parts */
+    .time {
+        display: flex;
+        align-items: center;
+    }
+
+    .colon {
+        display: inline-block;
+        width: 0.6em;   /* reserve space – no jitter */
+        text-align: center;
+    }
+
+    /* Progress bars */
+    .barContainer {
+        width: 80%;
+        height: 4vh;     /* chosen thickness */
+        position: relative;
+        overflow: hidden;
+    }
+
+    .barBase {
+        width: 100%;
+        height: 100%;
+    }
+
+    .barFill {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 0%;
+    }
+
+    /* Left side colors */
+    .leftBase { background: black; }
+    .leftFill { background: white; }
+
+    /* Right side colors */
+    .rightBase { background: white; }
+    .rightFill { background: black; }
+
+    /* Time over text */
+    .timeOver {
+        font-size: 1.6vh;
+        font-weight: bold;
+        display: none;
+    }
+
+    /* Rising-sun switch button */
+    #toggleBtn {
+        position: fixed;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 160px;
+        height: 80px;
+        background: black;
+        color: white;
+        font-size: 18px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 80px 80px 0 0;
+        z-index: 10;
+    }
+
+    #toggleBtn:active {
+        transform: translateX(-50%) scale(0.96);
+    }
+
+    /* Overlay */
+    #overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.7);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 20;
+    }
+
+    #setTimeBox {
+        background: #f0f0f0;
+        padding: 20px;
+        border-radius: 10px;
+        text-align: center;
+        width: 280px;
+    }
+
+    #setTimeBox input {
+        width: 60px;
+        font-size: 20px;
+        text-align: center;
+        margin: 10px;
+    }
+
+    .boxBtn {
+        margin: 10px;
+        padding: 10px 20px;
+        font-size: 16px;
+        font-weight: bold;
+    }
+</style>
+</head>
+
+<body>
+
+<div id="setTimeBtn">SET TIME</div>
+
+<div id="clockContainer">
+
+    <!-- LEFT CLOCK -->
+    <div id="leftClock" class="clockSide">
+        <div class="time">
+            <span class="hh">00</span>
+            <span class="colon">:</span>
+            <span class="mm">05</span>
+        </div>
+
+        <div class="barContainer">
+            <div class="barBase leftBase"></div>
+            <div class="barFill leftFill"></div>
+        </div>
+
+        <div class="timeOver">TIME OVER</div>
+    </div>
+
+    <!-- RIGHT CLOCK -->
+    <div id="rightClock" class="clockSide">
+        <div class="time">
+            <span class="hh">00</span>
+            <span class="colon">:</span>
+            <span class="mm">05</span>
+        </div>
+
+        <div class="barContainer">
+            <div class="barBase rightBase"></div>
+            <div class="barFill rightFill"></div>
+        </div>
+
+        <div class="timeOver">TIME OVER</div>
+    </div>
+
+</div>
+
+<div id="toggleBtn">SWITCH</div>
+
+<!-- Set Time Overlay -->
+<div id="overlay">
+    <div id="setTimeBox">
+        <h3>Set Time</h3>
+        <div>
+            <input type="number" id="hoursInput" min="0" value="0"> h
+            <input type="number" id="minutesInput" min="0" value="5"> m
+        </div>
+        <button class="boxBtn" id="startBtn">START</button>
+        <button class="boxBtn" id="cancelBtn">CANCEL</button>
+    </div>
+</div>
+
+<script>
+    let leftTime = 300;
+    let rightTime = 300;
+    let initialTime = 300;
+
+    let active = null;
+    let interval = null;
+    let blink = true;
+    let gameOver = false;
+
+    const leftClock = document.getElementById("leftClock");
+    const rightClock = document.getElementById("rightClock");
+
+    function updateClock(clockElem, time, isActive) {
+        const hh = clockElem.querySelector(".hh");
+        const mm = clockElem.querySelector(".mm");
+        const colon = clockElem.querySelector(".colon");
+        const fill = clockElem.querySelector(".barFill");
+        const overText = clockElem.querySelector(".timeOver");
+
+        let h = Math.floor(time / 3600);
+        let m = Math.floor((time % 3600) / 60);
+
+        hh.textContent = String(h).padStart(2, "0");
+        mm.textContent = String(m).padStart(2, "0");
+
+        // Colon behavior
+        if (isActive && !gameOver) {
+            colon.style.opacity = blink ? "1" : "0";
+        } else {
+            colon.style.opacity = "1";
+        }
+
+        // Progress bar
+        let progress = 1 - (time / initialTime);
+        progress = Math.min(Math.max(progress, 0), 1);
+        fill.style.width = (progress * 100) + "%";
+
+        // Time over
+        if (time <= 0) {
+            overText.style.display = "block";
+        } else {
+            overText.style.display = "none";
+        }
+    }
+
+    function updateDisplay() {
+        updateClock(leftClock, leftTime, active === "left");
+        updateClock(rightClock, rightTime, active === "right");
+    }
+
+    function stopGame() {
+        clearInterval(interval);
+        active = null;
+        gameOver = true;
+        updateDisplay();
+    }
+
+    function startClock(side) {
+        if (gameOver) return;
+
+        clearInterval(interval);
+        active = side;
+
+        interval = setInterval(() => {
+            if (active === "left") {
+                leftTime--;
+                if (leftTime <= 0) stopGame();
+            } else {
+                rightTime--;
+                if (rightTime <= 0) stopGame();
+            }
+            updateDisplay();
+        }, 1000);
+    }
+
+    /* Blink timer */
+    setInterval(() => {
+        blink = !blink;
+        updateDisplay();
+    }, 500);
+
+    document.getElementById("toggleBtn").onclick = () => {
+        if (gameOver) return;
+        if (active === "left") startClock("right");
+        else startClock("left");
+    };
+
+    document.getElementById("setTimeBtn").onclick = () => {
+        clearInterval(interval);
+        active = null;
+        gameOver = false;
+        document.getElementById("overlay").style.display = "flex";
+        updateDisplay();
+    };
+
+    document.getElementById("startBtn").onclick = () => {
+        let h = parseInt(hoursInput.value) || 0;
+        let m = parseInt(minutesInput.value) || 0;
+
+        initialTime = h * 3600 + m * 60;
+        leftTime = rightTime = initialTime;
+        gameOver = false;
+
+        document.getElementById("overlay").style.display = "none";
+        updateDisplay();
+    };
+
+    document.getElementById("cancelBtn").onclick = () => {
+        document.getElementById("overlay").style.display = "none";
+    };
+
+    updateDisplay();
+</script>
+
+</body>
+</html>
